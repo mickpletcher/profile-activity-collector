@@ -20,7 +20,7 @@ class ParsedActivity:
 
 
 def infer_activity_type_from_path(path: Path) -> str:
-    file_name = path.as_posix().lower()
+    file_name = path.name.lower()
     if "comment" in file_name:
         return "comments"
     if "reaction" in file_name:
@@ -61,6 +61,7 @@ def parse_json_file(path: Path, source: str = "facebook_export") -> list[ParsedA
         url = _extract_url(candidate)
         actor = _extract_actor(candidate)
         target = _extract_target(candidate)
+        source_item_id = _extract_source_item_id(candidate)
 
         if not any([created_at, title, body, url]):
             continue
@@ -79,6 +80,7 @@ def parse_json_file(path: Path, source: str = "facebook_export") -> list[ParsedA
                 title=title,
                 body=body,
                 source_file=path.as_posix(),
+                source_item_id=source_item_id,
             ),
             source=source,
             activity_type=normalize_activity_type(activity_type),
@@ -207,4 +209,12 @@ def _extract_target(item: dict[str, Any]) -> str:
         value = item.get(key)
         if isinstance(value, str):
             return value
+    return ""
+
+
+def _extract_source_item_id(item: dict[str, Any]) -> str:
+    for key in ("id", "post_id", "comment_id", "media_id"):
+        value = item.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
     return ""

@@ -1,0 +1,20 @@
+{
+  "tweets": [
+    {
+      "tweet": {
+        "id_str": "1800000000000000003",
+        "full_text": "First item from first list",
+        "created_at": "2024-05-03T12:00:00Z"
+      }
+    }
+  ],
+  "likes": [
+    {
+      "like": {
+        "tweet_id": "1800000000000000004",
+        "full_text": "Second item from second list",
+        "created_at": "2024-05-04T12:00:00Z"
+      }
+    }
+  ]
+}

@@ -16,7 +16,7 @@ class ParsedActivity:
 
 
 def infer_activity_type_from_path(path: Path) -> str:
-    file_name = path.as_posix().lower()
+    file_name = path.name.lower()
     if "comment" in file_name:
         return "comments"
     if "reaction" in file_name or "like" in file_name:
@@ -60,6 +60,7 @@ def parse_csv_file(path: Path, source: str = "linkedin_archive") -> list[ParsedA
             url = _pick(clean_row, ["URL", "Link", "Permalink", "Post Link"])
             actor = _pick(clean_row, ["Actor", "Profile Name", "Name", "From"])
             target = _pick(clean_row, ["Target", "To", "Company", "Group"])
+            source_item_id = _pick(clean_row, ["ID", "Id", "URN", "Entity URN", "Post ID"])
 
             if not any([created_at, title, body, url]):
                 continue
@@ -78,6 +79,7 @@ def parse_csv_file(path: Path, source: str = "linkedin_archive") -> list[ParsedA
                     title=title,
                     body=body,
                     source_file=path.as_posix(),
+                    source_item_id=source_item_id,
                 ),
                 source=source,
                 activity_type=normalize_activity_type(activity_type),

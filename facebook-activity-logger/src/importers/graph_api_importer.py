@@ -34,38 +34,51 @@ class GraphAPIImporter:
                 "limit": 100,
             }
 
-            response = requests.get(url, params=params, timeout=20)
-            response.raise_for_status()
-            payload = response.json()
+            while url:
+                response = requests.get(url, params=params, timeout=20)
+                response.raise_for_status()
+                payload = response.json()
 
-            for post in payload.get("data", []):
-                items_found += 1
-                created_at = post.get("created_time", "")
-                body = post.get("message", "")
-                activity = Activity(
-                    id=post.get("id", ""),
-                    source="graph_api",
-                    activity_type=normalize_activity_type("posts"),
-                    title=(body[:100] if body else "Graph API Post"),
-                    body=body,
-                    url=post.get("permalink_url", ""),
-                    created_at=created_at,
-                    updated_at=created_at,
-                    actor="self",
-                    target="",
-                    metadata={"graph_object": "post"},
-                )
+                for post in payload.get("data", []):
+                    items_found += 1
+                    created_at = post.get("created_time", "")
+                    body = post.get("message", "")
+                    post_id = post.get("id", "")
+                    activity = Activity(
+                        id=post_id
+                        or Activity.build_id(
+                            "graph_api",
+                            "posts",
+                            created_at,
+                            body[:100],
+                            body,
+                            "graph_api:/me/posts",
+                        ),
+                        source="graph_api",
+                        activity_type=normalize_activity_type("posts"),
+                        title=(body[:100] if body else "Graph API Post"),
+                        body=body,
+                        url=post.get("permalink_url", ""),
+                        created_at=created_at,
+                        updated_at=created_at,
+                        actor="self",
+                        target="",
+                        metadata={"graph_object": "post"},
+                    )
 
-                inserted = self.database.insert_activity(activity)
-                if inserted:
-                    items_imported += 1
+                    inserted = self.database.insert_activity(activity)
+                    if inserted:
+                        items_imported += 1
 
-                self.database.insert_raw_item(
-                    source="graph_api",
-                    source_file="graph_api:/me/posts",
-                    activity_id=activity.id,
-                    raw_item=post,
-                )
+                    self.database.insert_raw_item(
+                        source="graph_api",
+                        source_file="graph_api:/me/posts",
+                        activity_id=activity.id,
+                        raw_item=post,
+                    )
+
+                url = payload.get("paging", {}).get("next", "")
+                params = {}
 
             self.database.finish_import(
                 import_id=import_id,

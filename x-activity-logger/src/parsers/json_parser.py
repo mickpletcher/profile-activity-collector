@@ -17,7 +17,7 @@ class ParsedActivity:
 
 
 def infer_activity_type_from_path(path: Path) -> str:
-    file_name = path.as_posix().lower()
+    file_name = path.name.lower()
     if "tweet" in file_name:
         return "tweets"
     if "reply" in file_name:
@@ -67,6 +67,7 @@ def parse_archive_file(path: Path, source: str = "x_archive") -> list[ParsedActi
         url = _extract_url(normalized_item)
         actor = _extract_actor(normalized_item)
         target = _extract_target(normalized_item)
+        source_item_id = _extract_source_item_id(normalized_item)
 
         if not any([created_at, body, title, url]):
             continue
@@ -85,6 +86,7 @@ def parse_archive_file(path: Path, source: str = "x_archive") -> list[ParsedActi
                 title=title,
                 body=body,
                 source_file=path.as_posix(),
+                source_item_id=source_item_id,
             ),
             source=source,
             activity_type=normalize_activity_type(activity_type),
@@ -110,13 +112,21 @@ def parse_archive_file(path: Path, source: str = "x_archive") -> list[ParsedActi
 
 
 def _extract_items(content: Any) -> list[dict[str, Any]]:
+    items: list[dict[str, Any]] = []
+
     if isinstance(content, list):
         return [item for item in content if isinstance(item, dict)]
 
     if isinstance(content, dict):
-        for value in content.values():
+        for key, value in content.items():
             if isinstance(value, list):
-                return [item for item in value if isinstance(item, dict)]
+                items.extend(item for item in value if isinstance(item, dict))
+            elif isinstance(value, dict) and key.startswith("window."):
+                items.extend(_extract_items(value))
+
+        if items:
+            return items
+
         return [content]
 
     return []
@@ -166,6 +176,14 @@ def _extract_url(item: dict[str, Any]) -> str:
     if isinstance(item.get("tweet_id"), str):
         return f"https://x.com/i/web/status/{item['tweet_id']}"
 
+    return ""
+
+
+def _extract_source_item_id(item: dict[str, Any]) -> str:
+    for key in ("id_str", "tweet_id", "id", "conversationId"):
+        value = item.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
     return ""
 
 

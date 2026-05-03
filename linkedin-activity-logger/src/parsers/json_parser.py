@@ -16,7 +16,7 @@ class ParsedActivity:
 
 
 def infer_activity_type_from_path(path: Path) -> str:
-    file_name = path.as_posix().lower()
+    file_name = path.name.lower()
     if "comment" in file_name:
         return "comments"
     if "reaction" in file_name or "like" in file_name:
@@ -61,6 +61,7 @@ def parse_json_file(path: Path, source: str = "linkedin_archive") -> list[Parsed
         url = _pick(candidate, ["url", "link", "permalink"])
         actor = _pick(candidate, ["actor", "name", "author", "from"])
         target = _pick(candidate, ["target", "to", "company", "group"])
+        source_item_id = _pick(candidate, ["id", "urn", "entityUrn", "post_id"])
 
         if not any([created_at, title, body, url]):
             continue
@@ -79,6 +80,7 @@ def parse_json_file(path: Path, source: str = "linkedin_archive") -> list[Parsed
                 title=title,
                 body=body,
                 source_file=path.as_posix(),
+                source_item_id=source_item_id,
             ),
             source=source,
             activity_type=normalize_activity_type(activity_type),

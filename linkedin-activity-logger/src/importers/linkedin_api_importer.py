@@ -40,38 +40,57 @@ class LinkedInAPIImporter:
                 "count": 100,
             }
 
-            response = requests.get(url, headers=headers, params=params, timeout=20)
-            response.raise_for_status()
-            payload = response.json()
+            start = 0
+            while True:
+                params["start"] = start
+                response = requests.get(url, headers=headers, params=params, timeout=20)
+                response.raise_for_status()
+                payload = response.json()
+                elements = payload.get("elements", [])
 
-            for item in payload.get("elements", []):
-                items_found += 1
-                created_at_ms = item.get("created", {}).get("time")
-                created_at = str(created_at_ms) if created_at_ms else ""
-                activity = Activity(
-                    id=item.get("id", "") or Activity.build_id("linkedin_api", "posts", created_at, "ugc post", "", "api"),
-                    source="linkedin_api",
-                    activity_type=normalize_activity_type("posts"),
-                    title="LinkedIn UGC Post",
-                    body="",
-                    url="",
-                    created_at=created_at,
-                    updated_at=created_at,
-                    actor=self.person_urn,
-                    target="",
-                    metadata={"lifecycleState": item.get("lifecycleState", "")},
-                )
+                for item in elements:
+                    items_found += 1
+                    created_at_ms = item.get("created", {}).get("time")
+                    created_at = str(created_at_ms) if created_at_ms else ""
+                    activity = Activity(
+                        id=item.get("id", "")
+                        or Activity.build_id(
+                            "linkedin_api",
+                            "posts",
+                            created_at,
+                            "ugc post",
+                            "",
+                            "api",
+                        ),
+                        source="linkedin_api",
+                        activity_type=normalize_activity_type("posts"),
+                        title="LinkedIn UGC Post",
+                        body="",
+                        url="",
+                        created_at=created_at,
+                        updated_at=created_at,
+                        actor=self.person_urn,
+                        target="",
+                        metadata={"lifecycleState": item.get("lifecycleState", "")},
+                    )
 
-                inserted = self.database.insert_activity(activity)
-                if inserted:
-                    items_imported += 1
+                    inserted = self.database.insert_activity(activity)
+                    if inserted:
+                        items_imported += 1
 
-                self.database.insert_raw_item(
-                    source="linkedin_api",
-                    source_file="linkedin_api:/ugcPosts",
-                    activity_id=activity.id,
-                    raw_item=item,
-                )
+                    self.database.insert_raw_item(
+                        source="linkedin_api",
+                        source_file="linkedin_api:/ugcPosts",
+                        activity_id=activity.id,
+                        raw_item=item,
+                    )
+
+                paging = payload.get("paging", {})
+                total = paging.get("total", 0)
+                count = paging.get("count", len(elements))
+                start += count
+                if not elements or not total or start >= total:
+                    break
 
             self.database.finish_import(
                 import_id=import_id,

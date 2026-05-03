@@ -1,0 +1,15 @@
+{
+  "status_updates": [
+    {
+      "timestamp": 1715086400,
+      "title": "Guy posted a status update",
+      "data": [
+        {
+          "post": "A short local-first project note."
+        }
+      ],
+      "url": "https://www.facebook.com/example/posts/101",
+      "id": "post-101"
+    }
+  ]
+}
