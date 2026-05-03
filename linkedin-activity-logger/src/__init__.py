@@ -1,0 +1,1 @@
+"""LinkedIn Activity Logger package."""

@@ -1,0 +1,80 @@
+from __future__ import annotations
+
+import logging
+from pathlib import Path
+
+from src.config import redact_sensitive_fields
+from src.database import Database
+from src.parsers.csv_parser import parse_csv_file
+from src.parsers.json_parser import parse_json_file
+
+logger = logging.getLogger(__name__)
+
+
+class LinkedInArchiveImporter:
+    def __init__(self, database: Database) -> None:
+        self.database = database
+
+    def import_from_path(self, import_path: Path) -> dict:
+        import_path = import_path.resolve()
+        import_id = self.database.start_import(source="linkedin_archive", import_path=import_path.as_posix())
+
+        items_found = 0
+        items_imported = 0
+
+        try:
+            files = sorted(import_path.rglob("*.csv")) + sorted(import_path.rglob("*.json"))
+            for archive_file in files:
+                if archive_file.suffix.lower() == ".csv":
+                    parsed_activities = parse_csv_file(archive_file, source="linkedin_archive")
+                else:
+                    parsed_activities = parse_json_file(archive_file, source="linkedin_archive")
+
+                items_found += len(parsed_activities)
+
+                for parsed in parsed_activities:
+                    inserted = self.database.insert_activity(parsed.activity)
+                    if inserted:
+                        items_imported += 1
+
+                    self.database.insert_raw_item(
+                        source="linkedin_archive",
+                        source_file=parsed.source_file,
+                        activity_id=parsed.activity.id,
+                        raw_item=parsed.raw_item,
+                    )
+
+                logger.info(
+                    "Processed LinkedIn archive file",
+                    extra={
+                        "details": redact_sensitive_fields(
+                            {
+                                "file": archive_file.as_posix(),
+                                "parsed_activities": len(parsed_activities),
+                            }
+                        )
+                    },
+                )
+
+            self.database.finish_import(
+                import_id=import_id,
+                status="completed",
+                items_found=items_found,
+                items_imported=items_imported,
+            )
+
+            return {
+                "import_id": import_id,
+                "source": "linkedin_archive",
+                "items_found": items_found,
+                "items_imported": items_imported,
+            }
+        except Exception as exc:
+            self.database.finish_import(
+                import_id=import_id,
+                status="failed",
+                items_found=items_found,
+                items_imported=items_imported,
+                error=str(exc),
+            )
+            raise
